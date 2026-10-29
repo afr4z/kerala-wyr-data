@@ -1,56 +1,51 @@
 # Kerala WYR — Ward Your Representative Data
 
-Complete elected representative data for all 23,573 local body members across Kerala, scraped from [SEC Kerala](https://sec.kerala.gov.in) — the State Election Commission website.
+Complete elected representative data for all 23,573 local body members across Kerala, scraped from [SEC Kerala](https://sec.kerala.gov.in).
 
 ## What's Included
 
-- **`data/kerala_wyr_all_members.csv`** — All 23,573 members across 14 districts, covering:
-  - 17,335 Grama Panchayat members
-  - 3,205 Municipality members
-  - 2,267 Block Panchayat members
-  - 420 Corporation members
-  - 346 District Panchayat members
+- **`data/kerala_wyr_all_members.csv`** — All 23,573 members (17,335 GP, 3,205 Municipality, 2,267 Block, 420 Corp, 346 DP)
+- **`data/reps.json`** — Compact JSON export for API/website consumption
+- **`scripts/scrape_wyr_kerala.py`** — Standalone scraper (downloads all listing pages, parses, enriches)
+- **`api/members.js`** — Vercel serverless API for querying member data
+- **`index.html`** — Frontend to browse, search, and view member details
 
-  Each row includes: District, LB Type, LB Name, Ward No, Ward Name, Member Name, Party, Coalition, Reservation, Position, Phone, Address, Age, Gender, Votes, Margin
+## Quick Start — Browse Members
 
-- **`scripts/scrape_wyr_kerala.py`** — Main scraper that downloads all member data from SEC Kerala
-- **`scripts/fix_districts.py`** — Data cleanup script (handles missing/normalized district names)
-- **`scripts/correlate_complaints.py`** — Correlates ParathiPetty complaints against representatives using OSM geocoding + fuzzy ward matching
+Deploy to Vercel:
+
+```bash
+vercel --prod
+```
+
+Or serve locally:
+
+```bash
+npx serve .
+```
+
+Then visit the website to filter by district, body type, search by name, and click any member for full details (phone, WhatsApp link, position).
+
+## API Endpoints (hosted on Vercel)
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/stats` | Total counts by district and type |
+| `GET /api/districts` | List all 14 districts with counts |
+| `GET /api/types` | List all 5 body types with counts |
+| `GET /api/lbs?district=X&type=Y` | List local bodies for a district/type |
+| `GET /api/members` | Search members (`?district=`, `?type=`, `?lb=`, `?search=`, `?limit=`, `?offset=`) |
+| `GET /api/members/:id` | Member by index, phone, or name search |
+
+Example: `/api/members?district=KASARGOD&type=Grama Panchayat&limit=10`
+
+## Scraper Usage
+
+```bash
+pip install beautifulsoup4
+python scripts/scrape_wyr_kerala.py
+```
 
 ## Data Source
 
-All representative data is from the **Kerala State Election Commission** website:
-https://sec.kerala.gov.in/public/wyr
-
-The data was scraped from public WYR (Ward Your Representative) pages on SEC Kerala and is provided as-is.
-
-## How to Use
-
-```bash
-# Install dependencies (for correlation script)
-pip install requests beautifulsoup4
-
-# Run scraper (downloads fresh data)
-python scrips/scrape_wyr_kerala.py
-
-# Run correlation with ParathiPetty complaints
-python scripts/correlate_complaints.py
-```
-
-## Matching with ParathiPetty
-
-The `correlate_complaints.py` script:
-1. Fetches complaints from [ParathiPetty](https://parathipetty.com) API
-2. Geocodes complaint locations using Nominatim + Overpass API
-3. Matches complaints to representatives by district → local body → ward
-4. Generates a CSV with matched representative details and WhatsApp links
-
-### Match Accuracy
-
-- **Ward-level**: ~87% of geocodable complaints matched to specific representatives
-- **LSGI-level**: Remaining matched at local body level (President fallback)
-- Matching uses exact, substring, and Levenshtein fuzzy matching for ward names
-
-## License
-
-MIT — Data sourced from public government records (SEC Kerala).
+All data from [SEC Kerala](https://sec.kerala.gov.in/public/wyr) public WYR pages. MIT license.

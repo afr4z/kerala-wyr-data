@@ -3,3 +3,7 @@ __pycache__/
 *.pyo
 .venv/
 env/
+.node_modules/
+.vercel/
+.vscode/
+.vercel

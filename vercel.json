@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": ".",
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/members.js" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}

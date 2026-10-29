@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kerala WYR Members</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0f172a; }
+
+.header { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 1.1rem; font-weight: 700; }
+.header h1 span { color: #38bdf8; }
+.header .count-badge { background: rgba(255,255,255,0.1); padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+
+.stats-bar { display: flex; gap: 0.5rem; padding: 0.4rem 1rem; background: #fff; border-bottom: 1px solid #e2e8f0; overflow-x: auto; font-size: 0.7rem; -webkit-overflow-scrolling: touch; }
+.stats-bar::-webkit-scrollbar { display: none; }
+.stat-item { white-space: nowrap; }
+.stat-item strong { font-size: 0.85rem; }
+
+.filters { background: #fff; padding: 0.6rem 0.75rem; display: flex; flex-wrap: wrap; gap: 0.4rem; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10; }
+.filter-group { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.filter-group label { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.filter-group select, .filter-group input { padding: 0.35rem 0.4rem; border-radius: 5px; font-size: 0.78rem; border: 1px solid #cbd5e1; background: #fff; width: 100%; min-width: 0; }
+.filter-group select:focus, .filter-group input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,0.15); }
+
+#results { max-width: 100%; overflow-x: auto; }
+.loading { text-align: center; padding: 3rem 1rem; color: #64748b; }
+.loading .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #0f172a; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 0.75rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { padding: 0.75rem 1rem; background: #fef2f2; color: #991b1b; font-size: 0.82rem; border-bottom: 1px solid #fecaca; }
+.empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
+
+/* --- Desktop table --- */
+.members-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.members-table th { background: #f8fafc; text-align: left; padding: 0.5rem 0.6rem; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.members-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+.members-table tr:hover td { background: #f8fafc; }
+
+/* --- Mobile card --- */
+.member-card { display: none; background: #fff; margin: 0.5rem 0.75rem; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 0.75rem; cursor: pointer; }
+.member-card .card-row1 { display: flex; justify-content: space-between; align-items: start; gap: 0.5rem; }
+.member-card .card-name { font-size: 0.9rem; font-weight: 700; }
+.member-card .card-meta { font-size: 0.75rem; color: #475569; margin-top: 0.2rem; }
+.member-card .card-meta span { color: #94a3b8; }
+.member-card .card-phone { font-size: 0.85rem; font-weight: 600; color: #0f172a; text-decoration: none; margin-top: 0.35rem; display: inline-block; }
+
+.phone-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+.party-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; background: #e2e8f0; white-space: nowrap; }
+.party-badge.ldf { background: #fecaca; color: #991b1b; }
+.party-badge.udf { background: #fef3c7; color: #92400e; }
+.party-badge.bjp { background: #fed7aa; color: #9a3412; }
+.party-badge.oth { background: #e0e7ff; color: #3730a3; }
+
+.detail-panel { position: fixed; right: 0; top: 0; height: 100%; width: 380px; max-width: 100vw; background: #fff; box-shadow: -4px 0 24px rgba(0,0,0,0.12); z-index: 100; overflow-y: auto; transform: translateX(100%); transition: transform 0.2s ease; }
+.detail-panel.open { transform: translateX(0); }
+.detail-panel .panel-header { padding: 0.85rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: start; }
+.detail-panel .panel-header h2 { font-size: 0.95rem; }
+.detail-panel .close-btn { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: #64748b; padding: 0.25rem; }
+.detail-panel .panel-body { padding: 1rem; }
+.detail-panel .field { margin-bottom: 0.7rem; }
+.detail-panel .field label { display: block; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin-bottom: 0.1rem; }
+.detail-panel .field .value { font-size: 0.88rem; }
+.detail-panel .wa-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 8px; background: #25D366; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.82rem; margin-top: 0.5rem; }
+.detail-panel .wa-btn:hover { background: #1da954; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 99; display: none; }
+.overlay.show { display: block; }
+
+.pagination { display: flex; justify-content: center; align-items: center; gap: 0.5rem; padding: 0.75rem; background: #fff; border-top: 1px solid #e2e8f0; }
+.pagination button { padding: 0.35rem 0.8rem; border-radius: 6px; font-size: 0.8rem; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 500; min-height: 36px; }
+.pagination button:hover:not(:disabled) { background: #f1f5f9; }
+.pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+.pagination .page-info { font-size: 0.78rem; color: #64748b; }
+
+@media (max-width: 640px) {
+  .header { padding: 0.6rem 0.75rem; }
+  .header h1 { font-size: 0.95rem; }
+  .filters { padding: 0.5rem 0.6rem; gap: 0.3rem; }
+  .filter-group select, .filter-group input { font-size: 0.72rem; padding: 0.3rem 0.35rem; }
+  .stats-bar { font-size: 0.65rem; padding: 0.3rem 0.75rem; }
+  .members-table { display: none; }
+  .member-card { display: block; }
+  .detail-panel { width: 100vw; }
+}
+
+@media (min-width: 641px) {
+  .member-card { display: none !important; }
+  .members-table { display: table; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Kerala <span>WYR</span> Members</h1>
+  <div class="count-badge" id="totalBadge">Loading...</div>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="filters">
+  <div class="filter-group">
+    <label>District</label>
+    <select id="districtFilter"><option value="">All</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Type</label>
+    <select id="typeFilter"><option value="">All</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Local Body</label>
+    <select id="lbFilter"><option value="">All</option></select>
+  </div>
+  <div class="filter-group" style="flex:1.5">
+    <label>Search</label>
+    <input id="searchInput" placeholder="Name, ward..." type="search">
+  </div>
+</div>
+
+<div id="error" class="error" style="display:none"></div>
+<div id="results">
+  <div class="loading"><div class="spinner"></div>Loading members...</div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-header">
+    <h2 id="detailName"></h2>
+    <button class="close-btn" id="closeDetail">&times;</button>
+  </div>
+  <div class="panel-body" id="detailBody"></div>
+</div>
+
+<div class="pagination" id="pagination" style="display:none">
+  <button id="prevBtn" disabled>Previous</button>
+  <span class="page-info" id="pageInfo"></span>
+  <button id="nextBtn" disabled>Next</button>
+</div>
+
+<script>
+let currentPage = 0, pageSize = 100;
+
+function partyClass(p) {
+  const l = (p || "").toLowerCase();
+  if (l.includes("communist")) return "ldf";
+  if (l.includes("congress") || l.includes("muslim") || l.includes("league")) return "udf";
+  if (l.includes("bharatiya") || l.includes("bjp")) return "bjp";
+  return "oth";
+}
+
+async function loadMeta() {
+  const [stats] = await Promise.all([
+    fetch("/api/stats").then(r => r.json()),
+  ]);
+  const s = stats.districtBreakdown || [];
+  document.getElementById("totalBadge").textContent = `${stats.total.toLocaleString()} members`;
+
+  const ds = document.getElementById("districtFilter");
+  s.forEach(d => { const o = document.createElement("option"); o.value = d.name; o.textContent = `${d.name} (${d.count.toLocaleString()})`; ds.appendChild(o); });
+
+  const ts = document.getElementById("typeFilter");
+  (stats.typeBreakdown || []).forEach(t => { const o = document.createElement("option"); o.value = t.name; o.textContent = `${t.name} (${t.count.toLocaleString()})`; ts.appendChild(o); });
+
+  document.getElementById("statsBar").innerHTML = s.map(d => `<span class="stat-item"><strong>${d.count.toLocaleString()}</strong> ${d.name}</span>`).join("");
+}
+
+async function loadLBs() {
+  const district = document.getElementById("districtFilter").value;
+  const type = document.getElementById("typeFilter").value;
+  const res = await fetch(`/api/lbs?district=${encodeURIComponent(district)}&type=${encodeURIComponent(type)}`);
+  const data = await res.json();
+  const sel = document.getElementById("lbFilter");
+  sel.innerHTML = '<option value="">All</option>';
+  (data.data || []).forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
+}
+
+let debounceTimer;
+function scheduleSearch() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(search, 250);
+}
+
+async function search(page = 0) {
+  currentPage = page;
+  const district = document.getElementById("districtFilter").value;
+  const type = document.getElementById("typeFilter").value;
+  const lb = document.getElementById("lbFilter").value;
+  const search = document.getElementById("searchInput").value;
+  const offset = page * pageSize;
+
+  document.getElementById("results").innerHTML = '<div class="loading"><div class="spinner"></div>Searching...</div>';
+  document.getElementById("error").style.display = "none";
+
+  try {
+    const params = new URLSearchParams();
+    if (district) params.set("district", district);
+    if (type) params.set("type", type);
+    if (lb) params.set("lb", lb);
+    if (search) params.set("search", search);
+    params.set("limit", pageSize);
+    params.set("offset", offset);
+
+    const res = await fetch(`/api/members?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const results = data.data || [];
+    renderResults(results, data.total);
+  } catch (e) {
+    document.getElementById("results").innerHTML = "";
+    showError(e.message);
+  }
+}
+
+function renderResults(members, total) {
+  const container = document.getElementById("results");
+  container.innerHTML = "";
+
+  if (!members.length) {
+    container.innerHTML = '<div class="empty">No members found</div>';
+    document.getElementById("pagination").style.display = "none";
+    return;
+  }
+
+  const isMobile = window.innerWidth <= 640;
+
+  if (isMobile) {
+    // Cards for mobile
+    const wrapper = document.createElement("div");
+    members.forEach((m, i) => {
+      const idx = currentPage * pageSize + i + 1;
+      const card = document.createElement("div");
+      card.className = "member-card";
+      card.style.display = "block";
+      card.innerHTML = `
+        <div class="card-row1">
+          <div>
+            <div class="card-name">${m.m || "?"}</div>
+            <div class="card-meta"><span>${m.n || ""}</span>${m.wn ? ` &middot; Ward ${m.wn}` : ""}</div>
+            <div class="card-meta">${m.d || ""} &middot; ${m.t || ""}</div>
+          </div>
+          <span class="party-badge ${partyClass(m.p)}">${m.p || ""}</span>
+        </div>
+        ${m.ph ? `<a class="card-phone" href="tel:${m.ph}">${m.ph}</a>` : ""}
+      `;
+      card.addEventListener("click", () => showDetail(m, idx));
+      wrapper.appendChild(card);
+    });
+    container.appendChild(wrapper);
+  } else {
+    // Table for desktop
+    const table = document.createElement("table");
+    table.className = "members-table";
+    table.innerHTML = `
+      <thead><tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Party</th>
+        <th>District</th>
+        <th>Type</th>
+        <th>Local Body</th>
+        <th>Ward</th>
+        <th>Phone</th>
+      </tr></thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector("tbody");
+    members.forEach((m, i) => {
+      const idx = currentPage * pageSize + i + 1;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx}</td>
+        <td><strong>${m.m || "?"}</strong></td>
+        <td><span class="party-badge ${partyClass(m.p)}">${m.p || ""}</span></td>
+        <td>${m.d || ""}</td>
+        <td>${m.t || ""}</td>
+        <td>${m.n || ""}</td>
+        <td>${m.wn ? `${m.wn} - ${m.w}` : m.w || ""}</td>
+        <td>${m.ph ? `<a class="phone-link" href="tel:${m.ph}">${m.ph}</a>` : ""}</td>
+      `;
+      tr.addEventListener("click", () => showDetail(m, idx));
+      tr.style.cursor = "pointer";
+      tbody.appendChild(tr);
+    });
+    container.appendChild(table);
+  }
+
+  const totalPages = Math.ceil(total / pageSize);
+  const pag = document.getElementById("pagination");
+  pag.style.display = "flex";
+  document.getElementById("prevBtn").disabled = currentPage === 0;
+  document.getElementById("nextBtn").disabled = currentPage >= totalPages - 1;
+  document.getElementById("pageInfo").textContent = `Page ${currentPage + 1} of ${totalPages} (${total.toLocaleString()})`;
+}
+
+function showDetail(m, idx) {
+  document.getElementById("detailName").textContent = `${m.m || "?"}`;
+  document.getElementById("detailBody").innerHTML = `
+    <div class="field"><label>District</label><div class="value">${m.d || ""}</div></div>
+    <div class="field"><label>Body Type</label><div class="value">${m.t || ""}</div></div>
+    <div class="field"><label>Local Body</label><div class="value">${m.n || ""}</div></div>
+    <div class="field"><label>Ward</label><div class="value">${m.wn ? `${m.wn} - ${m.w}` : m.w || ""}</div></div>
+    <div class="field"><label>Member</label><div class="value"><strong>${m.m || ""}</strong></div></div>
+    <div class="field"><label>Party</label><div class="value">${m.p || ""}</div></div>
+    <div class="field"><label>Position</label><div class="value">${m.pos || ""}</div></div>
+    <div class="field"><label>Phone</label><div class="value">${m.ph ? `<a href="tel:${m.ph}">${m.ph}</a>` : "N/A"}</div></div>
+    ${m.ph ? `<a class="wa-btn" href="https://wa.me/91${m.ph.replace(/\D/g, "").slice(-10)}?text=Respected ${encodeURIComponent(m.m)},%0A%0AI am a resident of ${encodeURIComponent(m.w)} ward in ${encodeURIComponent(m.n)}.%0A%0A" target="_blank">WhatsApp</a>` : ""}
+  `;
+  document.getElementById("overlay").classList.add("show");
+  document.getElementById("detailPanel").classList.add("open");
+}
+
+document.getElementById("closeDetail").addEventListener("click", () => {
+  document.getElementById("overlay").classList.remove("show");
+  document.getElementById("detailPanel").classList.remove("open");
+});
+document.getElementById("overlay").addEventListener("click", () => {
+  document.getElementById("overlay").classList.remove("show");
+  document.getElementById("detailPanel").classList.remove("open");
+});
+
+document.getElementById("districtFilter").addEventListener("change", () => { loadLBs(); scheduleSearch(); });
+document.getElementById("typeFilter").addEventListener("change", () => { loadLBs(); scheduleSearch(); });
+document.getElementById("lbFilter").addEventListener("change", scheduleSearch);
+document.getElementById("searchInput").addEventListener("input", scheduleSearch);
+document.getElementById("prevBtn").addEventListener("click", () => search(currentPage - 1));
+document.getElementById("nextBtn").addEventListener("click", () => search(currentPage + 1));
+
+function showError(msg) {
+  const el = document.getElementById("error");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => el.style.display = "none", 5000);
+}
+
+loadMeta().then(() => { loadLBs(); search(); });
+</script>
+</body>
+</html>

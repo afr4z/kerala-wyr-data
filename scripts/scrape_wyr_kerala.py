@@ -1,16 +1,13 @@
-import requests
 import csv
 import re
 import os
 import subprocess
 import time
-from datetime import datetime
 from bs4 import BeautifulSoup
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE = "https://sec.kerala.gov.in/public"
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+ROOT = "https://sec.kerala.gov.in"
 DISTRICT_NAMES = {
     1: "Kasaragod", 2: "Kannur", 3: "Wayanad", 4: "Kozhikode",
     5: "Malappuram", 6: "Palakkad", 7: "Thrissur", 8: "Ernakulam",
@@ -19,25 +16,63 @@ DISTRICT_NAMES = {
 }
 OUTPUT_CSV = "kerala_wyr_all_members.csv"
 TMP_DIR = "/tmp/wyr_scrape"
-os.makedirs(TMP_DIR, exist_ok=True)
+LISTING_DIR = f"{TMP_DIR}/listings"
+os.makedirs(LISTING_DIR, exist_ok=True)
+
+CANONICAL = {
+    'KASARGOD': 'KASARGOD', 'Kannur': 'KANNUR', 'Wayanad': 'WAYANAD',
+    'Kozhikode': 'KOZHIKODE', 'Malappuram': 'MALAPPURAM',
+    'Palakkad': 'PALAKKAD', 'Thrissur': 'THRISSUR',
+    'Ernakulam': 'ERNAKULAM', 'Idukki': 'IDUKKI',
+    'Kottayam': 'KOTTAYAM', 'Alappuzha': 'ALAPPUZHA',
+    'Pathanamthitta': 'PATHANAMTHITTA', 'Kollam': 'KOLLAM',
+    'Thiruvananthapuram': 'THIRUVANANTHAPURAM',
+    'Kasaragod': 'KASARGOD',
+    'KANNUR': 'KANNUR', 'WAYANAD': 'WAYANAD', 'KOZHIKODE': 'KOZHIKODE',
+    'MALAPPURAM': 'MALAPPURAM', 'PALAKKAD': 'PALAKKAD',
+    'THRISSUR': 'THRISSUR', 'ERNAKULAM': 'ERNAKULAM',
+    'IDUKKI': 'IDUKKI', 'KOTTAYAM': 'KOTTAYAM',
+    'ALAPPUZHA': 'ALAPPUZHA', 'PATHANAMTHITTA': 'PATHANAMTHITTA',
+    'KOLLAM': 'KOLLAM', 'THIRUVANANTHAPURAM': 'THIRUVANANTHAPURAM',
+}
+
+LB_DISTRICT_MAP = {
+    'ചാലിയാര്‍': 'MALAPPURAM',
+    'പെരിങ്ങമ്മല': 'THIRUVANANTHAPURAM',
+    'നഗരൂര്‍': 'THIRUVANANTHAPURAM',
+    'നെന്‍മേനി': 'WAYANAD',
+    'അന്നമനട': 'THRISSUR',
+    'കാണക്കാരി': 'KOTTAYAM',
+    'പത്തനാപുരം': 'KOLLAM',
+    'അഞ്ചല്‍': 'KOLLAM',
+    'കൊട്ടാരക്കര': 'KOLLAM',
+}
 
 
-def fetch(url, timeout=60):
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=timeout)
-        resp.raise_for_status()
-        return resp.text
-    except Exception as e:
-        return None
-
-
-def fetch_with_curl(url, outpath, timeout=120):
+def curl_download(url, outpath, timeout=120):
     cmd = ["curl", "-s", "--max-time", str(timeout), "-o", outpath, url]
     try:
         subprocess.run(cmd, check=True, timeout=timeout+10)
         return os.path.getsize(outpath) if os.path.exists(outpath) else 0
     except:
         return 0
+
+
+def download_listing_pages():
+    suffixes = ['G', 'B', 'M', 'C', 'D']
+    lb_names = ['Grama Panchayat', 'Block Panchayat', 'Municipality', 'Corporation', 'District Panchayat']
+    to_dl = []
+    for n in range(1, 15):
+        for suffix in suffixes:
+            outpath = f"{LISTING_DIR}/wyrlb_{n}_{suffix}.html"
+            if not os.path.exists(outpath) or os.path.getsize(outpath) == 0:
+                url = f"{BASE}/wyrlb/{n}/{suffix}"
+                to_dl.append((url, outpath))
+    if to_dl:
+        print(f"Downloading {len(to_dl)} listing pages (14 districts x 5 types)...")
+        for url, outpath in to_dl:
+            curl_download(url, outpath)
+    print(f"Listing pages: {len(os.listdir(LISTING_DIR))} files")
 
 
 def find_card_header(soup, text_match):
@@ -77,7 +112,7 @@ def parse_wyrw_page(html, lb_type, lb_name, wyrw_id, district):
             'Ward_No': ward_no, 'Ward_Name': ward_name,
             'Member_Name': member_name, 'Party': party,
             'Reservation': reservation, 'Position': position,
-            'View_URL': f"{BASE}{view_link}" if view_link else "",
+            'View_URL': f"{ROOT}{view_link}" if view_link else "",
             'WYRW_ID': str(wyrw_id)
         })
     return members
@@ -159,14 +194,15 @@ def parse_view_page(html, member):
 def main():
     all_lb_types = {}  # maps source_table_type -> list of LB entries
 
-    # === STEP 1: Parse all listing pages ===
+    # === STEP 1: Download and parse listing pages ===
+    download_listing_pages()
     print("=== Step 1: Parsing listing pages ===")
 
     # GPs, Blocks, Municipalities (wyrw-based)
     for lb_type, suffix in [('Grama Panchayat', 'G'), ('Block Panchayat', 'B'), ('Municipality', 'M')]:
         entries = []
         for n in range(1, 15):
-            path = f'/tmp/wyrlb_{n}_{suffix}.html'
+            path = f'{LISTING_DIR}/wyrlb_{n}_{suffix}.html'
             if not os.path.exists(path):
                 continue
             with open(path) as f:
@@ -199,7 +235,7 @@ def main():
     # Corporations (C) - view-link based (same structure as wyrw page but embedded)
     corp_entries = []
     for n in range(1, 15):
-        path = f'/tmp/wyrlb_{n}_C.html'
+        path = f'{LISTING_DIR}/wyrlb_{n}_C.html'
         if not os.path.exists(path):
             continue
         with open(path) as f:
@@ -225,7 +261,7 @@ def main():
             ward_name = cells[1].get_text(strip=True)
             a = cells[2].find('a') if len(cells) > 2 else None
             member_name = a.get_text(strip=True) if a else cells[2].get_text(strip=True)
-            view_url = f"{BASE}{a['href']}" if a and 'href' in a.attrs else ""
+            view_url = f"{ROOT}{a['href']}" if a and 'href' in a.attrs else ""
             position = cells[3].get_text(strip=True) if len(cells) > 3 else ""
             party = cells[4].get_text(strip=True) if len(cells) > 4 else ""
             reservation = cells[5].get_text(strip=True) if len(cells) > 5 else ""
@@ -241,7 +277,7 @@ def main():
     # District Panchayats (D) - view-link based
     dist_entries = []
     for n in range(1, 15):
-        path = f'/tmp/wyrlb_{n}_D.html'
+        path = f'{LISTING_DIR}/wyrlb_{n}_D.html'
         if not os.path.exists(path):
             continue
         with open(path) as f:
@@ -258,7 +294,7 @@ def main():
             a = cells[2].find('a') if len(cells) > 2 else None
             if not a or 'href' not in a.attrs:
                 continue
-            view_url = f"{BASE}{a['href']}"
+            view_url = f"{ROOT}{a['href']}"
             dist_entries.append({
                 'District': DISTRICT_NAMES[n], 'LB_Type': 'District Panchayat',
                 'LB_Name': lb_name, 'View_URL': view_url,
@@ -424,8 +460,17 @@ def main():
     print(f"  District members: {len(dist_members)}")
     print(f"  Corporation members: {len(corp_members)}")
 
-    # === STEP 7: Combine and output ===
+    # === STEP 7: Combine, normalize districts, and output ===
     all_members = wyrw_members + dist_members + corp_members
+    for m in all_members:
+        d = m.get('District', '').strip()
+        if d in CANONICAL:
+            m['District'] = CANONICAL[d]
+        elif not d:
+            lb_name = m.get('LB_Name', '').strip()
+            if lb_name in LB_DISTRICT_MAP:
+                m['District'] = LB_DISTRICT_MAP[lb_name]
+
     fieldnames = [
         'District', 'LB_Type', 'LB_Name', 'Ward_No', 'Ward_Name',
         'Member_Name', 'Party', 'Coalition', 'Reservation', 'Position',
